@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pink Task Timer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #FFE6F3;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .time-display {
+            font-size: 180px;
+            font-weight: bold;
+            color: #FF69B4;
+            text-align: center;
+            margin: 40px 0;
+            font-family: monospace;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin: 30px 0;
+            text-align: center;
+        }
+        input {
+            font-size: 28px;
+            padding: 15px;
+            margin: 10px;
+            border: 3px solid #FFB6C1;
+            border-radius: 10px;
+            background: #FFF0F5;
+        }
+        input:focus {
+            outline: none;
+            border-color: #FF69B4;
+            box-shadow: 0 0 10px rgba(255,105,180,0.2);
+        }
+        .task-input {
+            width: 80%;
+        }
+        .time-input {
+            width: 120px;
+            text-align: center;
+        }
+        .button-group {
+            text-align: center;
+            margin: 40px 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        button {
+            font-size: 28px;
+            padding: 20px 40px;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            color: white;
+            transition: all 0.3s;
+            min-width: 200px;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        button:active {
+            transform: translateY(1px);
+        }
+        .start-btn {
+            background: #FF69B4;
+        }
+        .pause-btn {
+            background: #DDA0DD;
+        }
+        .stop-btn {
+            background: #FFB6C1;
+        }
+        .tasks-completed {
+            text-align: center;
+            font-size: 28px;
+            margin-top: 30px;
+            color: #FF69B4;
+            font-weight: bold;
+        }
+        label {
+            font-size: 24px;
+            color: #FF69B4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="input-group">
+            <input type="text" id="task-input" class="task-input" value="Focus Time" placeholder="Enter task name">
+        </div>
+        
+        <div class="input-group">
+            <input type="number" id="time-input" class="time-input" value="25" min="1" max="60">
+            <label> minutes</label>
+        </div>
+
+        <div class="time-display" id="timer">25:00</div>
+        
+        <div class="button-group">
+            <button class="start-btn" id="startBtn" onclick="toggleTimer()">Start</button>
+            <button class="pause-btn" onclick="pauseTimer()">Pause</button>
+            <button class="stop-btn" onclick="stopTimer()">Reset</button>
+        </div>
+
+        <div class="tasks-completed" id="tasks-completed">
+            Tasks completed today: 0
+        </div>
+    </div>
+
+    <script>
+        let timerInterval;
+        let secondsLeft;
+        let tasksCompleted = 0;
+        let isPaused = false;
+        let isRunning = false;
+        
+        try {
+            const savedCount = sessionStorage.getItem('tasksCompleted');
+            if (savedCount) {
+                tasksCompleted = parseInt(savedCount);
+                updateTaskCount();
+            }
+        } catch (e) {
+            console.log('Could not load saved count');
+        }
+
+        function updateDisplay() {
+            const minutes = Math.floor(secondsLeft / 60);
+            const seconds = secondsLeft % 60;
+            document.getElementById('timer').textContent = 
+                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function toggleTimer() {
+            const startBtn = document.getElementById('startBtn');
+            if (!isRunning) {
+                startTimer();
+                startBtn.textContent = 'Running...';
+            } else {
+                pauseTimer();
+                startBtn.textContent = 'Resume';
+            }
+        }
+
+        function startTimer() {
+            if (isRunning) return;
+            
+            if (!isPaused) {
+                const minutes = parseInt(document.getElementById('time-input').value);
+                if (isNaN(minutes) || minutes < 1) {
+                    alert('Please enter a valid time');
+                    return;
+                }
+                secondsLeft = minutes * 60;
+            }
+            
+            isRunning = true;
+            isPaused = false;
+            updateDisplay();
+            
+            timerInterval = setInterval(() => {
+                secondsLeft--;
+                updateDisplay();
+                
+                if (secondsLeft <= 0) {
+                    completeTask();
+                    stopTimer();
+                    try {
+                        beep();
+                    } catch (e) {
+                        console.log('Sound error');
+                    }
+                    alert('Time is up!');
+                    document.getElementById('startBtn').textContent = 'Start';
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            if (!isRunning) return;
+            clearInterval(timerInterval);
+            isRunning = false;
+            isPaused = true;
+            document.getElementById('startBtn').textContent = 'Resume';
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            isPaused = false;
+            const minutes = parseInt(document.getElementById('time-input').value);
+            secondsLeft = minutes * 60;
+            updateDisplay();
+            document.getElementById('startBtn').textContent = 'Start';
+        }
+
+        function beep() {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = ctx.createOscillator();
+            const gain = ctx.createGain();
+            oscillator.connect(gain);
+            gain.connect(ctx.destination);
+            gain.gain.value = 0.1;
+            oscillator.start(0);
+            setTimeout(() => oscillator.stop(), 200);
+        }
+
+        function completeTask() {
+            tasksCompleted++;
+            try {
+                sessionStorage.setItem('tasksCompleted', tasksCompleted);
+            } catch (e) {
+                console.log('Could not save count');
+            }
+            updateTaskCount();
+        }
+
+        function updateTaskCount() {
+            document.getElementById('tasks-completed').textContent = 
+                `Tasks completed today: ${tasksCompleted}`;
+        }
+
+        // Reset count at midnight
+        const now = new Date();
+        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const timeToMidnight = tomorrow - now;
+        
+        setTimeout(() => {
+            tasksCompleted = 0;
+            try {
+                sessionStorage.setItem('tasksCompleted', '0');
+            } catch (e) {
+                console.log('Could not reset count');
+            }
+            updateTaskCount();
+        }, timeToMidnight);
+    </script>
+</body>
+</html>
